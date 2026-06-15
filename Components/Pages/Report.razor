@@ -1,0 +1,481 @@
+@page "/report"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using System.Text
+@inject IAzureArmService AzureArmService
+@inject IDcrAnalysisService DcrAnalysisService
+@inject NavigationManager Navigation
+
+<PageTitle>DCR report</PageTitle>
+
+<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+    <div>
+        <h1 class="mb-2">DCR detail report</h1>
+        <p class="text-secondary mb-0">Review connectors, destination tables, transforms, and orphaned rules for the selected workspace.</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="workspace-picker">Pick another workspace</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+
+@if (_loading)
+{
+    <LoadingSpinner Message="Collecting DCRs, connectors, and usage data from Azure..." />
+}
+else if (_report is not null)
+{
+    <SummaryCard Data="@_report" />
+
+    <ul class="nav nav-tabs mt-4">
+        @foreach (var tab in _tabs)
+        {
+            <li class="nav-item">
+                <button class="@GetTabButtonClass(tab.Key)" @onclick="() => _activeTab = tab.Key">
+                    @tab.Value
+                </button>
+            </li>
+        }
+    </ul>
+
+    <div class="tab-content border border-top-0 rounded-bottom p-4 bg-white shadow-sm">
+        @switch (_activeTab)
+        {
+            case "connector":
+                @if (_report.Rows.Where(r => r.Status == "Active").GroupBy(r => r.ConnectedVia).Any())
+                {
+                    @foreach (var group in _report.Rows
+                        .Where(r => r.Status == "Active")
+                        .GroupBy(r => r.ConnectedVia)
+                        .OrderBy(g => g.Key))
+                    {
+                        <MermaidDiagram Title="@group.Key"
+                                        Description="@($"{group.Select(x => x.DcrResourceId).Distinct().Count()} active DCR(s)")"
+                                        Diagram="@BuildConnectorDiagram(group.Key, group)"
+                                        InitiallyExpanded="@(group.Key == _report.Rows.FirstOrDefault(r => r.Status == "Active")?.ConnectedVia)" />
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-secondary mb-0">No active connector-backed DCRs were found for this workspace.</div>
+                }
+                break;
+            case "dcr":
+                @foreach (var group in _report.Rows.GroupBy(r => r.DcrResourceId).OrderBy(g => g.First().DcrName))
+                {
+                    var first = group.First();
+                    <MermaidDiagram Title="@first.DcrName"
+                                    Description="@($"{group.Count()} flow(s) • {first.Status}")"
+                                    Diagram="@BuildDcrDiagram(group)"
+                                    InitiallyExpanded="false" />
+                }
+                break;
+            case "table":
+                @foreach (var group in _report.Rows.GroupBy(r => r.DestinationTable).OrderBy(g => g.Key))
+                {
+                    <MermaidDiagram Title="@group.Key"
+                                    Description="@($"{group.Count()} flow(s) • {FormatGb(group.Sum(x => x.IngestedGb30d))} in 30d")"
+                                    Diagram="@BuildTableDiagram(group.Key, group)"
+                                    InitiallyExpanded="false" />
+                }
+                break;
+            case "orphaned":
+                @if (OrphanedGroups.Count == 0)
+                {
+                    <div class="alert alert-success mb-0">No orphaned DCRs were detected for the selected workspace.</div>
+                }
+                else
+                {
+                    @foreach (var group in OrphanedGroups)
+                    {
+                        var first = group.First();
+                        <div class="card border-warning-subtle shadow-sm mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between gap-3 flex-wrap">
+                                    <div>
+                                        <h2 class="h5 mb-1">⚠ @first.DcrName</h2>
+                                        <div class="text-secondary small">@first.DcrResourceId</div>
+                                    </div>
+                                    <span class="badge text-bg-warning align-self-start">Orphaned</span>
+                                </div>
+                                <div class="mt-3">
+                                    <strong>Flows:</strong> @group.Count() &middot;
+                                    <strong>Kind:</strong> @first.DcrKind &middot;
+                                    <strong>Streams:</strong> @string.Join(", ", group.Select(x => x.InputStreams).Distinct())
+                                </div>
+                                <div class="table-responsive mt-3">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Output</th>
+                                                <th>Table</th>
+                                                <th>Transform</th>
+                                                <th>30d GB</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var row in group)
+                                            {
+                                                <tr>
+                                                    <td>@row.OutputStream</td>
+                                                    <td>@row.DestinationTable</td>
+                                                    <td>@(row.HasTransform ? row.TransformInsights : "None")</td>
+                                                    <td>@FormatGb(row.IngestedGb30d)</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                break;
+            case "flows":
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                @foreach (var column in _sortableColumns)
+                                {
+                                    <th>
+                                        <button class="btn btn-link btn-sm p-0 text-decoration-none" @onclick="() => ChangeSort(column.Key)">
+                                            @column.Value @SortIndicator(column.Key)
+                                        </button>
+                                    </th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in SortedRows)
+                            {
+                                <tr>
+                                    <td>@row.DcrName</td>
+                                    <td><code>@row.DcrKind</code></td>
+                                    <td>@row.FlowIndex</td>
+                                    <td class="text-wrap">@row.InputStreams</td>
+                                    <td>@row.OutputStream</td>
+                                    <td>@row.DestinationTable</td>
+                                    <td>@row.TableTier</td>
+                                    <td>
+                                        @if (row.HasTransform)
+                                        {
+                                            <span class="badge text-bg-info">@row.TransformInsights</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-secondary">None</span>
+                                        }
+                                    </td>
+                                    <td><span class="@GetStatusBadge(row.Status)">@row.Status</span></td>
+                                    <td>@row.ConnectedVia</td>
+                                    <td>@FormatGb(row.IngestedGb7d)</td>
+                                    <td>@FormatGb(row.IngestedGb30d)</td>
+                                    <td>@FormatGb(row.DailyAvgGb)</td>
+                                </tr>
+                                @if (row.HasTransform && !string.IsNullOrWhiteSpace(row.TransformKql))
+                                {
+                                    <tr class="table-secondary-subtle">
+                                        <td colspan="13">
+                                            <div class="small text-secondary mb-1">Transform KQL</div>
+                                            <pre class="mb-0 transform-kql">@row.TransformKql</pre>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                break;
+        }
+    </div>
+}
+
+@code {
+    private readonly Dictionary<string, string> _tabs = new()
+    {
+        ["connector"] = "By Connector",
+        ["dcr"] = "By DCR",
+        ["table"] = "By Destination Table",
+        ["orphaned"] = "Orphaned DCRs",
+        ["flows"] = "All Data Flows"
+    };
+
+    private readonly Dictionary<string, string> _sortableColumns = new()
+    {
+        ["DcrName"] = "DCR",
+        ["DcrKind"] = "Kind",
+        ["FlowIndex"] = "Flow",
+        ["InputStreams"] = "Input streams",
+        ["OutputStream"] = "Output",
+        ["DestinationTable"] = "Table",
+        ["TableTier"] = "Tier",
+        ["HasTransform"] = "Transform",
+        ["Status"] = "Status",
+        ["ConnectedVia"] = "Connector",
+        ["IngestedGb7d"] = "7d GB",
+        ["IngestedGb30d"] = "30d GB",
+        ["DailyAvgGb"] = "Daily avg GB"
+    };
+
+    private bool _loading = true;
+    private string? _errorMessage;
+    private DcrReportData? _report;
+    private string _activeTab = "connector";
+    private string _sortColumn = "DcrName";
+    private bool _sortAscending = true;
+    private string? _loadedKey;
+
+    [SupplyParameterFromQuery]
+    public string? SubscriptionId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "workspaceResourceId")]
+    public string? WorkspaceResourceId { get; set; }
+
+    private IEnumerable<DataFlowRow> SortedRows => OrderRows(_report?.Rows ?? [], _sortAscending, _sortColumn);
+    private List<IGrouping<string, DataFlowRow>> OrphanedGroups =>
+        _report?.Rows
+            .Where(r => r.Status == "Orphaned")
+            .GroupBy(r => r.DcrResourceId)
+            .OrderBy(g => g.First().DcrName)
+            .ToList() ?? [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var requestedKey = $"{SubscriptionId}|{WorkspaceResourceId}";
+        if (_loadedKey == requestedKey)
+        {
+            return;
+        }
+
+        await LoadReportAsync();
+    }
+
+    private async Task LoadReportAsync()
+    {
+        _loading = true;
+        _errorMessage = null;
+        _report = null;
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(SubscriptionId) || string.IsNullOrWhiteSpace(WorkspaceResourceId))
+            {
+                throw new InvalidOperationException("Select a subscription and workspace first.");
+            }
+
+            var workspaces = await AzureArmService.GetWorkspacesAsync(SubscriptionId);
+            var workspace = workspaces.FirstOrDefault(x => string.Equals(x.Id, WorkspaceResourceId, StringComparison.OrdinalIgnoreCase));
+
+            if (workspace is null)
+            {
+                throw new InvalidOperationException("The selected workspace could not be found in the chosen subscription.");
+            }
+
+            var dcrs = await AzureArmService.GetDataCollectionRulesAsync(SubscriptionId);
+            var connectors = await AzureArmService.GetDataConnectorsAsync(workspace);
+            var usage = await AzureArmService.GetUsageAsync(workspace);
+
+            _report = await DcrAnalysisService.AnalyzeAsync(workspace, dcrs, connectors, usage);
+            _loadedKey = $"{SubscriptionId}|{WorkspaceResourceId}";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void ChangeSort(string column)
+    {
+        if (_sortColumn == column)
+        {
+            _sortAscending = !_sortAscending;
+            return;
+        }
+
+        _sortColumn = column;
+        _sortAscending = true;
+    }
+
+    private string GetTabButtonClass(string key) =>
+        key == _activeTab ? "nav-link active" : "nav-link";
+
+    private string SortIndicator(string column) =>
+        _sortColumn != column ? string.Empty : _sortAscending ? "▲" : "▼";
+
+    private static string GetStatusBadge(string status) =>
+        status == "Active" ? "badge status-active" : "badge status-orphaned";
+
+    private static string FormatGb(double? value) =>
+        value is null ? "—" : $"{value.Value:N2}";
+
+    private string BuildConnectorDiagram(string connectorName, IEnumerable<DataFlowRow> rows)
+    {
+        var connectorParts = SplitConnectors(connectorName);
+        var builder = new StringBuilder();
+        builder.AppendLine("flowchart LR");
+        AppendClassDefinitions(builder);
+
+        foreach (var connector in connectorParts.Select((value, index) => new { value, index }))
+        {
+            var connectorId = $"connector_{SanitizeId(connector.value)}_{connector.index}";
+            builder.AppendLine($"{connectorId}[\"{EscapeLabel(connector.value)}\"]:::connector");
+
+            foreach (var row in rows.Where(r => r.ConnectedVia.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Contains(connector.value)))
+            {
+                AppendRow(builder, row, connectorId);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private string BuildDcrDiagram(IEnumerable<DataFlowRow> rows)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("flowchart LR");
+        AppendClassDefinitions(builder);
+
+        foreach (var row in rows)
+        {
+            var connectors = SplitConnectors(row.ConnectedVia);
+            if (connectors.Length == 0)
+            {
+                AppendRow(builder, row, null);
+                continue;
+            }
+
+            foreach (var connector in connectors.Select((value, index) => new { value, index }))
+            {
+                var connectorId = $"connector_{SanitizeId(row.DcrName)}_{connector.index}";
+                builder.AppendLine($"{connectorId}[\"{EscapeLabel(connector.value)}\"]:::connector");
+                AppendRow(builder, row, connectorId);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private string BuildTableDiagram(string tableName, IEnumerable<DataFlowRow> rows)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("flowchart LR");
+        AppendClassDefinitions(builder);
+
+        var tableNodeId = $"table_{SanitizeId(tableName)}";
+        builder.AppendLine($"{tableNodeId}[\"{EscapeLabel(tableName)}\"]:::table");
+
+        foreach (var row in rows)
+        {
+            var dcrId = GetDcrNodeId(row);
+            var streamId = GetStreamNodeId(row);
+            var connectorId = $"connector_{SanitizeId(row.DcrName)}";
+
+            if (row.Status == "Active" && row.ConnectedVia != "—")
+            {
+                builder.AppendLine($"{connectorId}[\"{EscapeLabel(row.ConnectedVia)}\"]:::connector");
+                builder.AppendLine($"{connectorId} --> {dcrId}");
+            }
+
+            builder.AppendLine($"{dcrId}[\"{GetDcrLabel(row)}\"]:::{GetDcrClass(row)}");
+            builder.AppendLine($"{streamId}[\"{EscapeLabel(row.OutputStream)}\"]:::stream");
+            var label = GetTransformLabel(row);
+            builder.AppendLine(label != null ? $"{dcrId} -- {label} --> {streamId}" : $"{dcrId} --> {streamId}");
+            builder.AppendLine($"{streamId} --> {tableNodeId}");
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendClassDefinitions(StringBuilder builder)
+    {
+        builder.AppendLine("classDef connector fill:#eef2ff,stroke:#6366f1,stroke-width:1px,color:#1f2937;");
+        builder.AppendLine("classDef active fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d;");
+        builder.AppendLine("classDef orphaned fill:#fff3cd,stroke:#d97706,stroke-width:2px,stroke-dasharray: 6 4,color:#7c2d12;");
+        builder.AppendLine("classDef stream fill:#f8fafc,stroke:#64748b,stroke-width:1px,color:#1f2937;");
+        builder.AppendLine("classDef table fill:#ffffff,stroke:#2563eb,stroke-width:1px,color:#1f2937;");
+    }
+
+    private static void AppendRow(StringBuilder builder, DataFlowRow row, string? connectorId)
+    {
+        var dcrId = GetDcrNodeId(row);
+        var streamId = GetStreamNodeId(row);
+        var tableId = GetTableNodeId(row);
+
+        if (!string.IsNullOrWhiteSpace(connectorId))
+        {
+            builder.AppendLine($"{connectorId} --> {dcrId}");
+        }
+
+        builder.AppendLine($"{dcrId}[\"{GetDcrLabel(row)}\"]:::{GetDcrClass(row)}");
+        builder.AppendLine($"{streamId}[\"{EscapeLabel(row.OutputStream)}\"]:::stream");
+        builder.AppendLine($"{tableId}[\"{EscapeLabel(row.DestinationTable)}\"]:::table");
+        var label = GetTransformLabel(row);
+        builder.AppendLine(label != null ? $"{dcrId} -- {label} --> {streamId}" : $"{dcrId} --> {streamId}");
+        builder.AppendLine($"{streamId} --> {tableId}");
+    }
+
+    private static string GetDcrNodeId(DataFlowRow row) => $"dcr_{GetShortHash(row.DcrResourceId)}";
+    private static string GetStreamNodeId(DataFlowRow row) => $"stream_{GetShortHash($"{row.DcrResourceId}_{row.FlowIndex}_{row.OutputStream}")}";
+    private static string GetTableNodeId(DataFlowRow row) => $"table_{GetShortHash($"{row.DcrResourceId}_{row.DestinationTable}")}";
+    private static string GetDcrClass(DataFlowRow row) => row.Status == "Active" ? "active" : "orphaned";
+    private static string GetDcrLabel(DataFlowRow row) => EscapeLabel($"{(row.Status == "Orphaned" ? "⚠ " : string.Empty)}{row.DcrName}");
+    private static string GetTransformLabel(DataFlowRow row) => row.HasTransform ? "transform" : null;
+    private static string EscapeLabel(string? value) => (value ?? "—").Replace("\"", "'").Replace("\r", " ").Replace("\n", "<br/>");
+    private static string SanitizeId(string? value) => GetShortHash(value);
+
+    private static string GetShortHash(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "x0";
+        // Use a stable short hash to keep Mermaid node IDs short and unique
+        uint hash = 0;
+        foreach (var ch in value)
+        {
+            hash = hash * 31 + ch;
+        }
+        return $"n{hash:x8}";
+    }
+
+    private static string[] SplitConnectors(string? value) =>
+        string.IsNullOrWhiteSpace(value) || value == "—"
+            ? []
+            : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private static IEnumerable<DataFlowRow> OrderRows(IEnumerable<DataFlowRow> rows, bool ascending, string column) =>
+        (column, ascending) switch
+        {
+            ("DcrName", true) => rows.OrderBy(x => x.DcrName),
+            ("DcrName", false) => rows.OrderByDescending(x => x.DcrName),
+            ("DcrKind", true) => rows.OrderBy(x => x.DcrKind),
+            ("DcrKind", false) => rows.OrderByDescending(x => x.DcrKind),
+            ("FlowIndex", true) => rows.OrderBy(x => x.FlowIndex),
+            ("FlowIndex", false) => rows.OrderByDescending(x => x.FlowIndex),
+            ("InputStreams", true) => rows.OrderBy(x => x.InputStreams),
+            ("InputStreams", false) => rows.OrderByDescending(x => x.InputStreams),
+            ("OutputStream", true) => rows.OrderBy(x => x.OutputStream),
+            ("OutputStream", false) => rows.OrderByDescending(x => x.OutputStream),
+            ("DestinationTable", true) => rows.OrderBy(x => x.DestinationTable),
+            ("DestinationTable", false) => rows.OrderByDescending(x => x.DestinationTable),
+            ("TableTier", true) => rows.OrderBy(x => x.TableTier),
+            ("TableTier", false) => rows.OrderByDescending(x => x.TableTier),
+            ("HasTransform", true) => rows.OrderBy(x => x.HasTransform),
+            ("HasTransform", false) => rows.OrderByDescending(x => x.HasTransform),
+            ("Status", true) => rows.OrderBy(x => x.Status),
+            ("Status", false) => rows.OrderByDescending(x => x.Status),
+            ("ConnectedVia", true) => rows.OrderBy(x => x.ConnectedVia),
+            ("ConnectedVia", false) => rows.OrderByDescending(x => x.ConnectedVia),
+            ("IngestedGb7d", true) => rows.OrderBy(x => x.IngestedGb7d),
+            ("IngestedGb7d", false) => rows.OrderByDescending(x => x.IngestedGb7d),
+            ("IngestedGb30d", true) => rows.OrderBy(x => x.IngestedGb30d),
+            ("IngestedGb30d", false) => rows.OrderByDescending(x => x.IngestedGb30d),
+            ("DailyAvgGb", true) => rows.OrderBy(x => x.DailyAvgGb),
+            ("DailyAvgGb", false) => rows.OrderByDescending(x => x.DailyAvgGb),
+            _ => rows.OrderBy(x => x.DcrName).ThenBy(x => x.FlowIndex)
+        };
+}

@@ -1,0 +1,89 @@
+body {
+    background: #f8fafc;
+}
+
+.hero-card,
+.info-panel,
+.metric-tile {
+    border-radius: 18px;
+}
+
+.hero-card {
+    background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+    border: 1px solid #dbeafe;
+    padding: 2.5rem;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.info-panel {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 1.5rem;
+}
+
+.summary-card {
+    overflow: hidden;
+}
+
+.metric-tile {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 1rem 1.1rem;
+    height: 100%;
+}
+
+.metric-label {
+    color: #64748b;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+}
+
+.metric-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.status-active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-orphaned {
+    background: #fff3cd;
+    color: #92400e;
+}
+
+.mermaid-card {
+    border-radius: 16px;
+}
+
+.mermaid-toggle {
+    border: 0;
+    background: transparent;
+}
+
+.mermaid-host {
+    overflow-x: auto;
+    min-height: 3rem;
+}
+
+.transform-kql {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 1rem;
+    border-radius: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.spinner-block {
+    min-height: 5rem;
+    justify-content: center;
+}
+
+.spinner-inline {
+    justify-content: flex-start;
+}

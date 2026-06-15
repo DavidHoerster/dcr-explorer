@@ -1,0 +1,94 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="card border-0 shadow-sm mb-3 mermaid-card">
+    <div class="card-header bg-white border-0 p-0">
+        <button class="btn w-100 text-start p-3 d-flex justify-content-between align-items-center mermaid-toggle"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#@_collapseId"
+                aria-expanded="@InitiallyExpanded.ToString().ToLowerInvariant()">
+            <span>
+                <span class="fw-semibold">@Title</span>
+                @if (!string.IsNullOrWhiteSpace(Description))
+                {
+                    <span class="text-secondary small d-block mt-1">@Description</span>
+                }
+            </span>
+            <span class="text-secondary">▼</span>
+        </button>
+    </div>
+    <div id="@_collapseId" class="collapse @(InitiallyExpanded ? "show" : null)">
+        <div class="card-body">
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div class="alert alert-warning mb-2">@_errorMessage</div>
+            }
+            <div class="d-flex justify-content-end mb-2">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="ReloadDiagram" title="Re-render diagram">
+                    🔄 Reload Diagram
+                </button>
+            </div>
+            @* Blazor does NOT manage children inside this div — Mermaid owns it *@
+            <div id="@_hostId" class="mermaid-host"></div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly string _hostId = $"mermaid_{Guid.NewGuid():N}";
+    private readonly string _collapseId = $"collapse_{Guid.NewGuid():N}";
+    private bool _initialRenderDone;
+    private string? _errorMessage;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Diagram { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool InitiallyExpanded { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RenderDiagramAsync();
+            _initialRenderDone = true;
+        }
+    }
+
+    private async Task ReloadDiagram()
+    {
+        _errorMessage = null;
+        await RenderDiagramAsync();
+    }
+
+    private async Task RenderDiagramAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("dcrMermaid.render", _hostId, Diagram);
+            _errorMessage = null;
+        }
+        catch
+        {
+            _errorMessage = "The diagram could not be rendered. Click 'Reload Diagram' to retry.";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("dcrMermaid.dispose", _hostId);
+        }
+        catch
+        {
+        }
+    }
+}

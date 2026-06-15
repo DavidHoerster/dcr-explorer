@@ -1,0 +1,181 @@
+@page "/workspace-picker"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@inject IAzureArmService AzureArmService
+@inject NavigationManager Navigation
+
+<PageTitle>Select workspace</PageTitle>
+
+<h1 class="mb-3">Select a workspace</h1>
+<p class="text-secondary mb-4">Choose a subscription and Log Analytics workspace, then run the DCR analysis.</p>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+
+<div class="row g-4">
+    <div class="col-xl-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-4">
+                @if (_loadingSubscriptions)
+                {
+                    <LoadingSpinner Message="Loading subscriptions from Azure Resource Manager..." />
+                }
+                else
+                {
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold" for="subscriptionSelect">Subscription</label>
+                        <select id="subscriptionSelect" class="form-select" @onchange="OnSubscriptionChanged">
+                            <option value="">Select a subscription</option>
+                            @foreach (var subscription in _subscriptions)
+                            {
+                                <option value="@subscription.SubscriptionId" selected="@(subscription.SubscriptionId == _selectedSubscriptionId)">
+                                    @subscription.DisplayName (@subscription.SubscriptionId)
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold" for="workspaceSelect">Workspace</label>
+                        @if (_loadingWorkspaces)
+                        {
+                            <LoadingSpinner Small="true" Message="Loading workspaces..." />
+                        }
+                        else
+                        {
+                            <select id="workspaceSelect" class="form-select" disabled="@(!_workspaces.Any())" @onchange="OnWorkspaceChanged">
+                                <option value="">Select a workspace</option>
+                                @foreach (var workspace in _workspaces)
+                                {
+                                    <option value="@workspace.Id" selected="@(workspace.Id == _selectedWorkspaceId)">
+                                        @workspace.Name (@workspace.Location)
+                                    </option>
+                                }
+                            </select>
+                        }
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" disabled="@(!CanAnalyze)" @onclick="AnalyzeAsync">
+                            Analyze workspace
+                        </button>
+                        <button class="btn btn-outline-secondary" disabled="@(!_subscriptions.Any())" @onclick="ReloadAsync">
+                            Refresh
+                        </button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-body p-4">
+                <h2 class="h5">What happens next?</h2>
+                <ol class="ps-3 mb-0 text-secondary">
+                    <li>Subscriptions are enumerated with the signed-in user’s ARM token.</li>
+                    <li>Workspaces are filtered to the selected subscription.</li>
+                    <li>The report page retrieves DCRs, Sentinel connectors, and Usage table volume.</li>
+                    <li>The analysis service builds summary stats, tables, and Mermaid diagrams.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<SubscriptionInfo> _subscriptions = [];
+    private List<WorkspaceInfo> _workspaces = [];
+    private string? _selectedSubscriptionId;
+    private string? _selectedWorkspaceId;
+    private bool _loadingSubscriptions = true;
+    private bool _loadingWorkspaces;
+    private string? _errorMessage;
+
+    private bool CanAnalyze =>
+        !_loadingSubscriptions &&
+        !_loadingWorkspaces &&
+        !string.IsNullOrWhiteSpace(_selectedSubscriptionId) &&
+        !string.IsNullOrWhiteSpace(_selectedWorkspaceId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSubscriptionsAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _selectedSubscriptionId = null;
+        _selectedWorkspaceId = null;
+        _workspaces.Clear();
+        await LoadSubscriptionsAsync();
+    }
+
+    private async Task LoadSubscriptionsAsync()
+    {
+        _loadingSubscriptions = true;
+        _errorMessage = null;
+
+        try
+        {
+            _subscriptions = (await AzureArmService.GetSubscriptionsAsync()).OrderBy(x => x.DisplayName).ToList();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _loadingSubscriptions = false;
+        }
+    }
+
+    private async Task OnSubscriptionChanged(ChangeEventArgs args)
+    {
+        _selectedSubscriptionId = args.Value?.ToString();
+        _selectedWorkspaceId = null;
+        _workspaces.Clear();
+        _errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(_selectedSubscriptionId))
+        {
+            return;
+        }
+
+        _loadingWorkspaces = true;
+
+        try
+        {
+            _workspaces = (await AzureArmService.GetWorkspacesAsync(_selectedSubscriptionId))
+                .OrderBy(x => x.Name)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _loadingWorkspaces = false;
+        }
+    }
+
+    private Task OnWorkspaceChanged(ChangeEventArgs args)
+    {
+        _selectedWorkspaceId = args.Value?.ToString();
+        return Task.CompletedTask;
+    }
+
+    private Task AnalyzeAsync()
+    {
+        if (!CanAnalyze)
+        {
+            return Task.CompletedTask;
+        }
+
+        Navigation.NavigateTo($"/report?subscriptionId={Uri.EscapeDataString(_selectedSubscriptionId!)}&workspaceResourceId={Uri.EscapeDataString(_selectedWorkspaceId!)}");
+        return Task.CompletedTask;
+    }
+}

@@ -1,0 +1,34 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page-shell">
+    <aside class="sidebar">
+        <NavMenu />
+    </aside>
+
+    <main class="main-shell">
+        <header class="top-row px-4">
+            <div>
+                <div class="text-uppercase small text-muted fw-semibold">Azure Monitor</div>
+                <div class="fw-semibold">DCR Detail Report Viewer</div>
+            </div>
+            <AuthorizeView>
+                <Authorized>
+                    <a class="btn btn-outline-secondary btn-sm" href="MicrosoftIdentity/Account/SignOut">Sign out</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-primary btn-sm" href="MicrosoftIdentity/Account/SignIn">Sign in</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </header>
+
+        <article class="content px-4 py-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

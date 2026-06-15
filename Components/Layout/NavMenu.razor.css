@@ -1,0 +1,103 @@
+.navbar-toggler {
+    appearance: none;
+    cursor: pointer;
+    width: 3.5rem;
+    height: 2.5rem;
+    color: white;
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") no-repeat center/1.75rem rgba(255, 255, 255, 0.08);
+}
+
+.navbar-toggler:checked {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.top-row {
+    min-height: 3.5rem;
+    background-color: rgba(255,255,255,0.04);
+}
+
+.navbar-brand {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.sidebar-subtitle {
+    color: rgba(255,255,255,0.7);
+    font-size: 0.85rem;
+    line-height: 1.35;
+}
+
+.nav-icon {
+    width: 1.5rem;
+    display: inline-flex;
+    justify-content: center;
+    margin-right: 0.5rem;
+}
+
+.nav-item {
+    font-size: 0.9rem;
+    padding-bottom: 0.5rem;
+}
+
+    .nav-item:first-of-type {
+        padding-top: 1rem;
+    }
+
+    .nav-item:last-of-type {
+        padding-bottom: 1rem;
+    }
+
+    .nav-item ::deep .nav-link {
+            color: rgba(255,255,255,0.85);
+        background: none;
+        border: none;
+            border-radius: 10px;
+        height: 3rem;
+        display: flex;
+        align-items: center;
+        line-height: 3rem;
+        width: 100%;
+    }
+
+.nav-item ::deep a.active {
+    background-color: rgba(255,255,255,0.15);
+    color: white;
+}
+
+.nav-item ::deep .nav-link:hover {
+    background-color: rgba(255,255,255,0.1);
+    color: white;
+}
+
+.signed-in-card {
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 14px;
+    padding: 1rem;
+    color: rgba(255,255,255,0.92);
+    background: rgba(15, 23, 42, 0.3);
+    font-size: 0.9rem;
+}
+
+.nav-scrollable {
+    display: none;
+}
+
+.navbar-toggler:checked ~ .nav-scrollable {
+    display: block;
+}
+
+@media (min-width: 641px) {
+    .navbar-toggler {
+        display: none;
+    }
+
+    .nav-scrollable {
+        display: block;
+        height: calc(100vh - 3.5rem);
+        overflow-y: auto;
+    }
+}
