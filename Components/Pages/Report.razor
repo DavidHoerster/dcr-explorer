@@ -134,6 +134,106 @@ else if (_report is not null)
                 }
                 break;
             case "flows":
+                <div class="border rounded-3 bg-light-subtle p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                        <div>
+                            <div class="fw-semibold">Filter flows</div>
+                            <div class="text-secondary small">Showing @FilteredRows.Count of @TotalFlowCount flows</div>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearFilters">Clear Filters</button>
+                    </div>
+
+                    <div class="d-flex gap-3 flex-wrap align-items-start">
+                        <details class="dropdown position-static">
+                            <summary class="btn btn-outline-secondary btn-sm dropdown-toggle">DCR Kind @GetSelectedCountLabel(_selectedDcrKinds.Count)</summary>
+                            <div class="dropdown-menu d-block p-3 shadow-sm mt-2">
+                                @foreach (var kind in DcrKindOptions)
+                                {
+                                    <label class="dropdown-item-text form-check mb-2">
+                                        <input class="form-check-input me-2"
+                                               type="checkbox"
+                                               checked="@_selectedDcrKinds.Contains(kind)"
+                                               @onchange="(ChangeEventArgs e) => ToggleFilter(_selectedDcrKinds, kind, e)" />
+                                        <span>@kind</span>
+                                    </label>
+                                }
+                            </div>
+                        </details>
+
+                        <div class="flex-grow-1" style="min-width: 16rem;">
+                            <label class="form-label small text-secondary mb-1">Destination Table</label>
+                            <input type="search"
+                                   class="form-control form-control-sm"
+                                   placeholder="Search destination tables"
+                                   @bind="_destinationTableFilter" />
+                        </div>
+
+                        <div style="min-width: 12rem;">
+                            <label class="form-label small text-secondary mb-1">Has Transform</label>
+                            <select class="form-select form-select-sm" @bind="_transformFilter">
+                                <option value="@FlowTransformFilter.All">All</option>
+                                <option value="@FlowTransformFilter.WithTransform">With Transform</option>
+                                <option value="@FlowTransformFilter.WithoutTransform">Without Transform</option>
+                            </select>
+                        </div>
+
+                        <details class="dropdown position-static">
+                            <summary class="btn btn-outline-secondary btn-sm dropdown-toggle">Status @GetSelectedCountLabel(_selectedStatuses.Count)</summary>
+                            <div class="dropdown-menu d-block p-3 shadow-sm mt-2">
+                                @foreach (var status in StatusOptions)
+                                {
+                                    <label class="dropdown-item-text form-check mb-2">
+                                        <input class="form-check-input me-2"
+                                               type="checkbox"
+                                               checked="@_selectedStatuses.Contains(status)"
+                                               @onchange="(ChangeEventArgs e) => ToggleFilter(_selectedStatuses, status, e)" />
+                                        <span>@status</span>
+                                    </label>
+                                }
+                            </div>
+                        </details>
+
+                        <details class="dropdown position-static">
+                            <summary class="btn btn-outline-secondary btn-sm dropdown-toggle">Connector @GetSelectedCountLabel(_selectedConnectors.Count)</summary>
+                            <div class="dropdown-menu d-block p-3 shadow-sm mt-2">
+                                @foreach (var connector in ConnectorOptions)
+                                {
+                                    <label class="dropdown-item-text form-check mb-2">
+                                        <input class="form-check-input me-2"
+                                               type="checkbox"
+                                               checked="@_selectedConnectors.Contains(connector)"
+                                               @onchange="(ChangeEventArgs e) => ToggleFilter(_selectedConnectors, connector, e)" />
+                                        <span>@connector</span>
+                                    </label>
+                                }
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap mt-3">
+                        @foreach (var kind in _selectedDcrKinds.OrderBy(x => x))
+                        {
+                            <span class="badge rounded-pill text-bg-primary">@kind</span>
+                        }
+                        @foreach (var status in _selectedStatuses.OrderBy(x => x))
+                        {
+                            <span class="badge rounded-pill text-bg-secondary">@status</span>
+                        }
+                        @foreach (var connector in _selectedConnectors.OrderBy(x => x))
+                        {
+                            <span class="badge rounded-pill text-bg-dark">@connector</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_destinationTableFilter))
+                        {
+                            <span class="badge rounded-pill text-bg-info">Table: @_destinationTableFilter</span>
+                        }
+                        @if (_transformFilter != FlowTransformFilter.All)
+                        {
+                            <span class="badge rounded-pill text-bg-warning">@(_transformFilter == FlowTransformFilter.WithTransform ? "With Transform" : "Without Transform")</span>
+                        }
+                    </div>
+                </div>
+
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
@@ -227,6 +327,11 @@ else if (_report is not null)
     private string _sortColumn = "DcrName";
     private bool _sortAscending = true;
     private string? _loadedKey;
+    private readonly HashSet<string> _selectedDcrKinds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _selectedStatuses = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _selectedConnectors = new(StringComparer.OrdinalIgnoreCase);
+    private string _destinationTableFilter = string.Empty;
+    private FlowTransformFilter _transformFilter = FlowTransformFilter.All;
 
     [SupplyParameterFromQuery]
     public string? SubscriptionId { get; set; }
@@ -234,7 +339,12 @@ else if (_report is not null)
     [SupplyParameterFromQuery(Name = "workspaceResourceId")]
     public string? WorkspaceResourceId { get; set; }
 
-    private IEnumerable<DataFlowRow> SortedRows => OrderRows(_report?.Rows ?? [], _sortAscending, _sortColumn);
+    private List<DataFlowRow> FilteredRows => ApplyFlowFilters(_report?.Rows ?? []).ToList();
+    private IEnumerable<DataFlowRow> SortedRows => OrderRows(FilteredRows, _sortAscending, _sortColumn);
+    private int TotalFlowCount => _report?.Rows.Count ?? 0;
+    private List<string> DcrKindOptions => GetDistinctOptions(_report?.Rows.Select(r => r.DcrKind) ?? []);
+    private List<string> StatusOptions => GetDistinctOptions(_report?.Rows.Select(r => r.Status) ?? []);
+    private List<string> ConnectorOptions => GetDistinctOptions((_report?.Rows ?? []).SelectMany(GetConnectorValues));
     private List<IGrouping<string, DataFlowRow>> OrphanedGroups =>
         _report?.Rows
             .Where(r => r.Status == "Orphaned")
@@ -280,6 +390,7 @@ else if (_report is not null)
 
             _report = await DcrAnalysisService.AnalyzeAsync(workspace, dcrs, connectors, usage);
             _loadedKey = $"{SubscriptionId}|{WorkspaceResourceId}";
+            ClearFilters();
         }
         catch (Exception ex)
         {
@@ -303,6 +414,26 @@ else if (_report is not null)
         _sortAscending = true;
     }
 
+    private void ToggleFilter(HashSet<string> filters, string value, ChangeEventArgs args)
+    {
+        if (args.Value is bool isChecked && isChecked)
+        {
+            filters.Add(value);
+            return;
+        }
+
+        filters.Remove(value);
+    }
+
+    private void ClearFilters()
+    {
+        _selectedDcrKinds.Clear();
+        _selectedStatuses.Clear();
+        _selectedConnectors.Clear();
+        _destinationTableFilter = string.Empty;
+        _transformFilter = FlowTransformFilter.All;
+    }
+
     private string GetTabButtonClass(string key) =>
         key == _activeTab ? "nav-link active" : "nav-link";
 
@@ -311,6 +442,8 @@ else if (_report is not null)
 
     private static string GetStatusBadge(string status) =>
         status == "Active" ? "badge status-active" : "badge status-orphaned";
+
+    private static string GetSelectedCountLabel(int count) => count == 0 ? string.Empty : $"({count})";
 
     private static string FormatGb(double? value) =>
         value is null ? "—" : $"{value.Value:N2}";
@@ -426,7 +559,7 @@ else if (_report is not null)
     private static string GetTableNodeId(DataFlowRow row) => $"table_{GetShortHash($"{row.DcrResourceId}_{row.DestinationTable}")}";
     private static string GetDcrClass(DataFlowRow row) => row.Status == "Active" ? "active" : "orphaned";
     private static string GetDcrLabel(DataFlowRow row) => EscapeLabel($"{(row.Status == "Orphaned" ? "⚠ " : string.Empty)}{row.DcrName}");
-    private static string GetTransformLabel(DataFlowRow row) => row.HasTransform ? "transform" : null;
+    private static string? GetTransformLabel(DataFlowRow row) => row.HasTransform ? "transform" : null;
     private static string EscapeLabel(string? value) => (value ?? "—").Replace("\"", "'").Replace("\r", " ").Replace("\n", "<br/>");
     private static string SanitizeId(string? value) => GetShortHash(value);
 
@@ -446,6 +579,33 @@ else if (_report is not null)
         string.IsNullOrWhiteSpace(value) || value == "—"
             ? []
             : value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    private IEnumerable<DataFlowRow> ApplyFlowFilters(IEnumerable<DataFlowRow> rows) =>
+        rows.Where(row =>
+            (_selectedDcrKinds.Count == 0 || _selectedDcrKinds.Contains(row.DcrKind)) &&
+            (_selectedStatuses.Count == 0 || _selectedStatuses.Contains(row.Status)) &&
+            (_selectedConnectors.Count == 0 || GetConnectorValues(row).Any(_selectedConnectors.Contains)) &&
+            (string.IsNullOrWhiteSpace(_destinationTableFilter) || row.DestinationTable.Contains(_destinationTableFilter, StringComparison.OrdinalIgnoreCase)) &&
+            _transformFilter switch
+            {
+                FlowTransformFilter.WithTransform => row.HasTransform,
+                FlowTransformFilter.WithoutTransform => !row.HasTransform,
+                _ => true
+            });
+
+    private static IEnumerable<string> GetConnectorValues(DataFlowRow row)
+    {
+        var connectors = SplitConnectors(row.ConnectedVia);
+        return connectors.Length == 0 ? [row.ConnectedVia] : connectors;
+    }
+
+    private static List<string> GetDistinctOptions(IEnumerable<string?> values) =>
+        values
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value)
+            .ToList();
 
     private static IEnumerable<DataFlowRow> OrderRows(IEnumerable<DataFlowRow> rows, bool ascending, string column) =>
         (column, ascending) switch
@@ -478,4 +638,11 @@ else if (_report is not null)
             ("DailyAvgGb", false) => rows.OrderByDescending(x => x.DailyAvgGb),
             _ => rows.OrderBy(x => x.DcrName).ThenBy(x => x.FlowIndex)
         };
+
+    private enum FlowTransformFilter
+    {
+        All,
+        WithTransform,
+        WithoutTransform
+    }
 }
