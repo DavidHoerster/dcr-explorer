@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>138f6b79-4b13-4de3-8ef2-eb461e8e2c53</UserSecretsId>
+    <!-- The test project lives under tests/; exclude it from the web project's default globs. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
