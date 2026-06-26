@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DcrDetailBlazor.Models;
 using DcrDetailBlazor.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace DcrDetailBlazor.Tests;
@@ -10,7 +11,7 @@ public class DcrAnalysisServiceTests
     private const string WorkspaceId =
         "/subscriptions/sub-1/resourceGroups/rg-obs/providers/Microsoft.OperationalInsights/workspaces/law-prod";
 
-    private readonly DcrAnalysisService _service = new();
+    private readonly DcrAnalysisService _service = new(NullLogger<DcrAnalysisService>.Instance);
     private static readonly WorkspaceInfo Workspace = new() { Id = WorkspaceId, Name = "law-prod" };
 
     // Parse JSON and detach the element from its document so it stays valid for the test's lifetime.

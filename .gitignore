@@ -2,8 +2,12 @@
 bin/
 obj/
 
-# User secrets
+# Local secret overrides — never commit these. The base appsettings.json holds only
+# shared, non-secret defaults (TenantId, ClientId, scopes) and stays tracked. Supply
+# secrets locally via `dotnet user-secrets` or environment variables, or place them in a
+# *.Local.json override that is ignored below. (Both casings listed for cross-platform safety.)
 appsettings.*.local.json
+appsettings.*.Local.json
 
 # Squad: ignore runtime state (logs, inbox, sessions)
 .squad/orchestration-log/

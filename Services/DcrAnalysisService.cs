@@ -3,7 +3,7 @@ using DcrDetailBlazor.Models;
 
 namespace DcrDetailBlazor.Services;
 
-public class DcrAnalysisService : IDcrAnalysisService
+public class DcrAnalysisService(ILogger<DcrAnalysisService> logger) : IDcrAnalysisService
 {
     public Task<DcrReportData> AnalyzeAsync(
         WorkspaceInfo workspace,
@@ -13,6 +13,10 @@ public class DcrAnalysisService : IDcrAnalysisService
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        logger.LogInformation(
+            "Analyzing workspace {WorkspaceName}: {DcrCount} data collection rule(s), {ConnectorCount} connector(s), {UsageCount} usage record(s).",
+            workspace.Name, dataCollectionRules.Count, dataConnectors.Count, usageRecords.Count);
 
         var normalizedWorkspaceId = workspace.Id.ToLowerInvariant();
         var usageByTable = usageRecords
@@ -98,6 +102,10 @@ public class DcrAnalysisService : IDcrAnalysisService
                 .ThenBy(x => x.FlowIndex)
                 .ToList()
         };
+
+        logger.LogInformation(
+            "Analysis complete for workspace {WorkspaceName}: {TotalDcrs} DCR(s) ({ActiveDcrs} active, {OrphanedDcrs} orphaned) across {TotalDataFlows} data flow row(s).",
+            workspace.Name, report.TotalDcrs, report.ActiveDcrs, report.OrphanedDcrs, report.TotalDataFlows);
 
         return Task.FromResult(report);
     }

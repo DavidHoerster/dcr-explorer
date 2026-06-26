@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
     <PackageReference Include="Microsoft.Identity.Web" Version="4.10.0" />
     <PackageReference Include="Microsoft.Identity.Web.MicrosoftGraph" Version="4.10.0" />
     <PackageReference Include="Microsoft.Identity.Web.UI" Version="4.10.0" />
