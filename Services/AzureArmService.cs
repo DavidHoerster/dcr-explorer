@@ -18,45 +18,29 @@ public class AzureArmService(
         .GetSection("DownstreamApis:AzureManagement:Scopes")
         .Get<string[]>() ?? ["https://management.azure.com/user_impersonation"];
 
-    public async Task<IReadOnlyList<SubscriptionInfo>> GetSubscriptionsAsync(CancellationToken cancellationToken = default)
-    {
-        var result = await GetAsync<AzureResourceListResponse<SubscriptionInfo>>(
+    public async Task<IReadOnlyList<SubscriptionInfo>> GetSubscriptionsAsync(CancellationToken cancellationToken = default) =>
+        await GetPagedAsync<SubscriptionInfo>(
             "/subscriptions?api-version=2022-12-01",
             "subscriptions",
             cancellationToken);
 
-        return result.Value;
-    }
-
-    public async Task<IReadOnlyList<WorkspaceInfo>> GetWorkspacesAsync(string subscriptionId, CancellationToken cancellationToken = default)
-    {
-        var result = await GetAsync<AzureResourceListResponse<WorkspaceInfo>>(
+    public async Task<IReadOnlyList<WorkspaceInfo>> GetWorkspacesAsync(string subscriptionId, CancellationToken cancellationToken = default) =>
+        await GetPagedAsync<WorkspaceInfo>(
             $"/subscriptions/{subscriptionId}/providers/Microsoft.OperationalInsights/workspaces?api-version=2023-09-01",
             "Log Analytics workspaces",
             cancellationToken);
 
-        return result.Value;
-    }
-
-    public async Task<IReadOnlyList<DataCollectionRuleResource>> GetDataCollectionRulesAsync(string subscriptionId, CancellationToken cancellationToken = default)
-    {
-        var result = await GetAsync<AzureResourceListResponse<DataCollectionRuleResource>>(
+    public async Task<IReadOnlyList<DataCollectionRuleResource>> GetDataCollectionRulesAsync(string subscriptionId, CancellationToken cancellationToken = default) =>
+        await GetPagedAsync<DataCollectionRuleResource>(
             $"/subscriptions/{subscriptionId}/providers/Microsoft.Insights/dataCollectionRules?api-version=2023-03-11",
             "data collection rules",
             cancellationToken);
 
-        return result.Value;
-    }
-
-    public async Task<IReadOnlyList<DataConnectorResource>> GetDataConnectorsAsync(WorkspaceInfo workspace, CancellationToken cancellationToken = default)
-    {
-        var result = await GetAsync<AzureResourceListResponse<DataConnectorResource>>(
+    public async Task<IReadOnlyList<DataConnectorResource>> GetDataConnectorsAsync(WorkspaceInfo workspace, CancellationToken cancellationToken = default) =>
+        await GetPagedAsync<DataConnectorResource>(
             $"{workspace.Id}/providers/Microsoft.SecurityInsights/dataConnectors?api-version=2025-03-01",
             "Sentinel data connectors",
             cancellationToken);
-
-        return result.Value;
-    }
 
     public async Task<IReadOnlyList<TableUsageRecord>> GetUsageAsync(WorkspaceInfo workspace, CancellationToken cancellationToken = default)
     {
@@ -108,6 +92,42 @@ public class AzureArmService(
         }
 
         return usage;
+    }
+
+    private async Task<List<T>> GetPagedAsync<T>(string initialUrl, string resourceDescription, CancellationToken cancellationToken)
+    {
+        const int maxPages = 1000;
+        var items = new List<T>();
+        string? nextUrl = initialUrl;
+        string? previousUrl = null;
+        var pageCount = 0;
+
+        while (!string.IsNullOrWhiteSpace(nextUrl))
+        {
+            if (++pageCount > maxPages)
+            {
+                logger.LogWarning(
+                    "ARM pagination for {ResourceDescription} exceeded {MaxPages} pages; stopping to avoid an unbounded loop. Results may be incomplete.",
+                    resourceDescription, maxPages);
+                break;
+            }
+
+            if (string.Equals(nextUrl, previousUrl, StringComparison.Ordinal))
+            {
+                logger.LogWarning(
+                    "ARM pagination for {ResourceDescription} returned a repeating nextLink; stopping to avoid an infinite loop. Results may be incomplete.",
+                    resourceDescription);
+                break;
+            }
+
+            var page = await GetAsync<AzureResourceListResponse<T>>(nextUrl, resourceDescription, cancellationToken);
+            items.AddRange(page.Value);
+
+            previousUrl = nextUrl;
+            nextUrl = page.NextLink;
+        }
+
+        return items;
     }
 
     private async Task<T> GetAsync<T>(string requestUri, string resourceDescription, CancellationToken cancellationToken)

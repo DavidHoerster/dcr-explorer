@@ -7,6 +7,9 @@ public class AzureResourceListResponse<T>
 {
     [JsonPropertyName("value")]
     public List<T> Value { get; set; } = [];
+
+    [JsonPropertyName("nextLink")]
+    public string? NextLink { get; set; }
 }
 
 public class SubscriptionInfo
