@@ -8,11 +8,14 @@ window.dcrMermaid = (() => {
 
         window.mermaid.initialize({
             startOnLoad: false,
-            securityLevel: "loose",
+            // strict: Mermaid HTML-escapes label text and forbids embedded markup
+            // and click handlers. Combined with htmlLabels:false this neutralizes
+            // attacker-influenced Azure resource names reaching the diagram source.
+            securityLevel: "strict",
             theme: "default",
             flowchart: {
                 useMaxWidth: true,
-                htmlLabels: true,
+                htmlLabels: false,
                 curve: "basis"
             }
         });
@@ -30,6 +33,9 @@ window.dcrMermaid = (() => {
             }
 
             const renderId = `${hostId}_svg_${Date.now()}`;
+            // mermaid.render returns SVG already sanitized by Mermaid under
+            // securityLevel:"strict". This sanitized SVG is the ONLY value ever
+            // assigned to innerHTML; raw/untrusted text is never injected here.
             const { svg } = await window.mermaid.render(renderId, definition);
             host.innerHTML = svg;
         },

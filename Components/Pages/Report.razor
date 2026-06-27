@@ -560,7 +560,7 @@ else if (_report is not null)
     private static string GetDcrClass(DataFlowRow row) => row.Status == "Active" ? "active" : "orphaned";
     private static string GetDcrLabel(DataFlowRow row) => EscapeLabel($"{(row.Status == "Orphaned" ? "⚠ " : string.Empty)}{row.DcrName}");
     private static string? GetTransformLabel(DataFlowRow row) => row.HasTransform ? "transform" : null;
-    private static string EscapeLabel(string? value) => (value ?? "—").Replace("\"", "'").Replace("\r", " ").Replace("\n", "<br/>");
+    private static string EscapeLabel(string? value) => MermaidLabelHelper.EscapeLabel(value);
     private static string SanitizeId(string? value) => GetShortHash(value);
 
     private static string GetShortHash(string? value)

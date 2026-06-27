@@ -44,6 +44,8 @@ public class AzureArmService(
 
     public async Task<IReadOnlyList<TableUsageRecord>> GetUsageAsync(WorkspaceInfo workspace, CancellationToken cancellationToken = default)
     {
+        logger.LogInformation("Querying 30-day table usage for workspace {WorkspaceName}.", workspace.Name);
+
         var query = """
             Usage
             | where TimeGenerated >= ago(30d)
@@ -70,6 +72,7 @@ public class AzureArmService(
 
         if (!document.RootElement.TryGetProperty("tables", out var tables) || tables.GetArrayLength() == 0)
         {
+            logger.LogInformation("Usage query for workspace {WorkspaceName} returned no tables.", workspace.Name);
             return [];
         }
 
@@ -91,6 +94,10 @@ public class AzureArmService(
             });
         }
 
+        logger.LogInformation(
+            "Retrieved usage for {TableCount} table(s) in workspace {WorkspaceName}.",
+            usage.Count, workspace.Name);
+
         return usage;
     }
 
@@ -102,30 +109,47 @@ public class AzureArmService(
         string? previousUrl = null;
         var pageCount = 0;
 
-        while (!string.IsNullOrWhiteSpace(nextUrl))
+        logger.LogInformation("Fetching {ResourceDescription} from Azure Resource Manager.", resourceDescription);
+
+        try
         {
-            if (++pageCount > maxPages)
+            while (!string.IsNullOrWhiteSpace(nextUrl))
             {
-                logger.LogWarning(
-                    "ARM pagination for {ResourceDescription} exceeded {MaxPages} pages; stopping to avoid an unbounded loop. Results may be incomplete.",
-                    resourceDescription, maxPages);
-                break;
+                if (++pageCount > maxPages)
+                {
+                    logger.LogWarning(
+                        "ARM pagination for {ResourceDescription} exceeded {MaxPages} pages; stopping to avoid an unbounded loop. Results may be incomplete.",
+                        resourceDescription, maxPages);
+                    break;
+                }
+
+                if (string.Equals(nextUrl, previousUrl, StringComparison.Ordinal))
+                {
+                    logger.LogWarning(
+                        "ARM pagination for {ResourceDescription} returned a repeating nextLink; stopping to avoid an infinite loop. Results may be incomplete.",
+                        resourceDescription);
+                    break;
+                }
+
+                var page = await GetAsync<AzureResourceListResponse<T>>(nextUrl, resourceDescription, cancellationToken);
+                items.AddRange(page.Value);
+
+                previousUrl = nextUrl;
+                nextUrl = page.NextLink;
             }
-
-            if (string.Equals(nextUrl, previousUrl, StringComparison.Ordinal))
-            {
-                logger.LogWarning(
-                    "ARM pagination for {ResourceDescription} returned a repeating nextLink; stopping to avoid an infinite loop. Results may be incomplete.",
-                    resourceDescription);
-                break;
-            }
-
-            var page = await GetAsync<AzureResourceListResponse<T>>(nextUrl, resourceDescription, cancellationToken);
-            items.AddRange(page.Value);
-
-            previousUrl = nextUrl;
-            nextUrl = page.NextLink;
         }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(
+                ex,
+                "Failed to retrieve {ResourceDescription} from Azure Resource Manager after {PageCount} page(s).",
+                resourceDescription, pageCount);
+            throw;
+        }
+
+        logger.LogInformation(
+            "Fetched {Count} {ResourceDescription} from Azure Resource Manager across {PageCount} page(s).",
+            items.Count, resourceDescription, pageCount);
 
         return items;
     }
@@ -167,6 +191,11 @@ public class AzureArmService(
 
     private async Task<HttpClient> CreateClientAsync(CancellationToken cancellationToken)
     {
+        // Auth model: delegated (on-behalf-of the signed-in user) via Microsoft.Identity.Web.
+        // GetAccessTokenForUserAsync returns a token scoped to the interactive user, so every ARM
+        // call honors that user's per-user RBAC. This is intentional and must NOT be replaced with
+        // DefaultAzureCredential / a managed identity — doing so would switch to an app identity,
+        // break per-user authorization, and undermine the workspace-picker experience.
         var token = await tokenAcquisition.GetAccessTokenForUserAsync(_scopes);
         var client = httpClientFactory.CreateClient("AzureManagement");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);

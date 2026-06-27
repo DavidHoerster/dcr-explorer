@@ -7,6 +7,11 @@ using Microsoft.Identity.Web.UI;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Application Insights. The connection string is resolved from configuration/environment
+// (APPLICATIONINSIGHTS_CONNECTION_STRING or ApplicationInsights:ConnectionString) — never hard-coded.
+// When no connection string is present the SDK no-ops, so local/dev runs are unaffected.
+builder.Services.AddApplicationInsightsTelemetry();
+
 var azureManagementScopes = builder.Configuration
     .GetSection("DownstreamApis:AzureManagement:Scopes")
     .Get<string[]>() ?? ["https://management.azure.com/user_impersonation"];
