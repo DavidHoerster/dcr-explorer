@@ -17,11 +17,11 @@ roadmap.
 
 | Issue | Title | Type | Priority | Owner | Status |
 |-------|-------|------|----------|-------|--------|
-| [#2](https://github.com/DavidHoerster/dcr-explorer/issues/2) | No automated test project | Testing | p1 | Holden / Alex | Not started |
-| [#3](https://github.com/DavidHoerster/dcr-explorer/issues/3) | ARM list responses ignore nextLink (silent truncation) | Correctness | p1 | Amos | Not started |
-| [#4](https://github.com/DavidHoerster/dcr-explorer/issues/4) | No observability (App Insights / structured logging) | Observability | p1 | Holden | Not started |
-| [#5](https://github.com/DavidHoerster/dcr-explorer/issues/5) | Secrets/config hygiene: appsettings not gitignored; plaintext ClientSecret | Security | p1 | Holden | Not started |
-| [#6](https://github.com/DavidHoerster/dcr-explorer/issues/6) | Mermaid diagram XSS risk (loose securityLevel + innerHTML) | Security | p1 | Naomi | Not started |
+| [#2](https://github.com/DavidHoerster/dcr-explorer/issues/2) | No automated test project | Testing | p1 | Holden / Alex | Done |
+| [#3](https://github.com/DavidHoerster/dcr-explorer/issues/3) | ARM list responses ignore nextLink (silent truncation) | Correctness | p1 | Amos | Done |
+| [#4](https://github.com/DavidHoerster/dcr-explorer/issues/4) | No observability (App Insights / structured logging) | Observability | p1 | Holden | Done |
+| [#5](https://github.com/DavidHoerster/dcr-explorer/issues/5) | Secrets/config hygiene: appsettings not gitignored; plaintext ClientSecret | Security | p1 | Holden | Done |
+| [#6](https://github.com/DavidHoerster/dcr-explorer/issues/6) | Mermaid diagram XSS risk (loose securityLevel + innerHTML) | Security | p1 | Naomi | Done |
 
 ### v0.6.0 — Reliability & UX hardening (p2)
 
@@ -44,7 +44,7 @@ roadmap.
 
 | Issue | Title | Type | Priority | Owner | Status |
 |-------|-------|------|----------|-------|--------|
-| [#19](https://github.com/DavidHoerster/dcr-explorer/issues/19) | Remove Counter/Weather scaffold pages | Cleanup | low | Naomi | Done |
+| [#19](https://github.com/DavidHoerster/dcr-explorer/issues/19) | Remove Counter/Weather scaffold pages | Cleanup | low | Naomi | In review |
 | [#20](https://github.com/DavidHoerster/dcr-explorer/issues/20) | Add ConfigureAwait(false) in service awaits | Maintainability | low | Amos | Not started |
 | [#21](https://github.com/DavidHoerster/dcr-explorer/issues/21) | Extract magic strings to constants | Maintainability | low | Amos | Not started |
 | [#22](https://github.com/DavidHoerster/dcr-explorer/issues/22) | MermaidDiagram.DisposeAsync swallows all exceptions | Bug | low | Naomi | Not started |
