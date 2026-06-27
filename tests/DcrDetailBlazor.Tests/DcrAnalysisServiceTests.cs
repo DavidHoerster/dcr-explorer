@@ -149,6 +149,74 @@ public class DcrAnalysisServiceTests
     }
 
     [Fact]
+    public async Task AnalyzeAsync_ClassifiesSourcePassThrough_AsDefault()
+    {
+        var rule = new DataCollectionRuleResource
+        {
+            Id = "/subscriptions/sub-1/resourceGroups/rg-obs/providers/Microsoft.Insights/dataCollectionRules/dcr-passthrough",
+            Name = "dcr-passthrough",
+            Properties = Json($$"""
+            {
+              "immutableId": "dcr-imm-passthrough",
+              "dataFlows": [
+                {
+                  "streams": ["Custom-Raw_CL"],
+                  "outputStream": "Custom-Raw_CL",
+                  "destinations": ["la"],
+                  "transformKql": "source"
+                }
+              ],
+              "destinations": {
+                "logAnalytics": [
+                  { "name": "la", "workspaceResourceId": "{{WorkspaceId}}" }
+                ]
+              }
+            }
+            """)
+        };
+
+        var report = await _service.AnalyzeAsync(Workspace, new[] { rule }, [], [], CancellationToken.None);
+
+        var row = Assert.Single(report.Rows);
+        Assert.True(row.HasTransform);
+        Assert.Equal("Default (pass-through)", row.TransformInsights);
+    }
+
+    [Fact]
+    public async Task AnalyzeAsync_ClassifiesUnknownTransform_AsCustomKql()
+    {
+        var rule = new DataCollectionRuleResource
+        {
+            Id = "/subscriptions/sub-1/resourceGroups/rg-obs/providers/Microsoft.Insights/dataCollectionRules/dcr-custom",
+            Name = "dcr-custom",
+            Properties = Json($$"""
+            {
+              "immutableId": "dcr-imm-custom",
+              "dataFlows": [
+                {
+                  "streams": ["Custom-Raw_CL"],
+                  "outputStream": "Custom-Raw_CL",
+                  "destinations": ["la"],
+                  "transformKql": "source | mv-expand items"
+                }
+              ],
+              "destinations": {
+                "logAnalytics": [
+                  { "name": "la", "workspaceResourceId": "{{WorkspaceId}}" }
+                ]
+              }
+            }
+            """)
+        };
+
+        var report = await _service.AnalyzeAsync(Workspace, new[] { rule }, [], [], CancellationToken.None);
+
+        var row = Assert.Single(report.Rows);
+        Assert.True(row.HasTransform);
+        Assert.Equal("Custom KQL", row.TransformInsights);
+    }
+
+    [Fact]
     public async Task AnalyzeAsync_AggregatesUsageVolumes()
     {
         var rules = new[] { ActiveRule() };
