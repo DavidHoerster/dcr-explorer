@@ -2,6 +2,18 @@
 
 ## Active Decisions
 
+### 2026-06-26T00:00:00Z: v0.5.0 secrets hygiene (#5) + observability (#4)
+
+**By:** Amos (backend), requested by David Hoerster
+**What:** Kept ITokenAcquisition / Microsoft.Identity.Web delegated user auth (did NOT switch to DefaultAzureCredential); removed plaintext ClientSecret from appsettings.json (now empty placeholder — supply via `dotnet user-secrets`); added Application Insights via `AddApplicationInsightsTelemetry()` (connection string read from `APPLICATIONINSIGHTS_CONNECTION_STRING` env or `ApplicationInsights:ConnectionString` config, no-ops when absent); added structured `ILogger` logging at the ARM fetch seams (`GetPagedAsync`, `GetUsageAsync`) and the analysis seam (`DcrAnalysisService.AnalyzeAsync`). Documented the delegated-auth decision with an inline note in `CreateClientAsync`.
+**Why:** #5 — plaintext secret risk in source-controlled config. #4 — no production diagnosability. Delegated auth is kept because switching to a managed/app identity would break per-user RBAC and the workspace picker.
+
+### 2026-06-26T00:00:00Z: Mermaid XSS hardening (#6)
+
+**By:** Naomi (frontend), requested by David Hoerster
+**What:** Set Mermaid `securityLevel: 'strict'` and `htmlLabels: false` in `wwwroot/js/mermaid-interop.js`; documented that `host.innerHTML = svg` only ever receives Mermaid's own strict-sanitized render output (no raw user text). Extracted the weak inline `EscapeLabel` from `Components/Pages/Report.razor` into a public, unit-testable `DcrDetailBlazor.Models.MermaidLabelHelper.EscapeLabel`, hardened to: collapse all whitespace/control chars to single spaces, downgrade `"` and backtick to `'` (kills the label-wrapper breakout), strip `< > [ ] { }` markup/Mermaid-shape delimiters, cap length at 120 chars, and return `—` for empty/fully-stripped input. Report.razor now delegates to the helper (all 8 call sites unchanged — single chokepoint). Added `tests/DcrDetailBlazor.Tests/MermaidLabelHelperTests.cs` (13 cases). Build clean; 37/37 tests pass.
+**Why:** #6 attacker-influenced Azure names could inject markup/diagram structure via loose securityLevel + htmlLabels + innerHTML + insufficient escaping.
+
 ### 2026-06-26T00:00:00Z: ARM nextLink pagination
 
 **By:** Amos (backend), requested by David Hoerster

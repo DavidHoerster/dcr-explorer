@@ -44,7 +44,7 @@ roadmap.
 
 | Issue | Title | Type | Priority | Owner | Status |
 |-------|-------|------|----------|-------|--------|
-| [#19](https://github.com/DavidHoerster/dcr-explorer/issues/19) | Remove Counter/Weather scaffold pages | Cleanup | low | Amos | Not started |
+| [#19](https://github.com/DavidHoerster/dcr-explorer/issues/19) | Remove Counter/Weather scaffold pages | Cleanup | low | Naomi | Done |
 | [#20](https://github.com/DavidHoerster/dcr-explorer/issues/20) | Add ConfigureAwait(false) in service awaits | Maintainability | low | Amos | Not started |
 | [#21](https://github.com/DavidHoerster/dcr-explorer/issues/21) | Extract magic strings to constants | Maintainability | low | Amos | Not started |
 | [#22](https://github.com/DavidHoerster/dcr-explorer/issues/22) | MermaidDiagram.DisposeAsync swallows all exceptions | Bug | low | Naomi | Not started |
