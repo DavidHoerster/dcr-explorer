@@ -5,9 +5,9 @@ Collection Rules (DCRs), maps DCRs → tables as Mermaid diagrams, and correlate
 Microsoft Sentinel data connectors.
 
 This plan tracks the **post-code-review remediation backlog** (GitHub issues
-#2–#24) and groups it into releases. GitHub issues are the source of truth; this
-document mirrors the release grouping so the team has a single, human-readable
-roadmap.
+#2–#24) plus subsequent post-review issues (#29–#30) and groups them into
+releases. GitHub issues are the source of truth; this document mirrors the
+release grouping so the team has a single, human-readable roadmap.
 
 ---
 
@@ -39,12 +39,14 @@ roadmap.
 | [#16](https://github.com/DavidHoerster/dcr-explorer/issues/16) | Pin Mermaid CDN to exact version | Security / Maintainability | p2 | Naomi | Not started |
 | [#17](https://github.com/DavidHoerster/dcr-explorer/issues/17) | Accessibility gaps in report table & diagram | Accessibility | p2 | Naomi | Not started |
 | [#18](https://github.com/DavidHoerster/dcr-explorer/issues/18) | Decompose ~800-line Report.razor | Refactor | p2 | Naomi | Not started |
+| [#29](https://github.com/DavidHoerster/dcr-explorer/issues/29) | Classify pass-through 'source' transforms as Default | Correctness / UX | p2 | Amos | In review |
+| [#30](https://github.com/DavidHoerster/dcr-explorer/issues/30) | Move 'What happens next?' callout to a dedicated Help page | UX / Feature | p2 | Naomi | Not started |
 
 ### backlog — Low priority / deferred
 
 | Issue | Title | Type | Priority | Owner | Status |
 |-------|-------|------|----------|-------|--------|
-| [#19](https://github.com/DavidHoerster/dcr-explorer/issues/19) | Remove Counter/Weather scaffold pages | Cleanup | low | Naomi | In review |
+| [#19](https://github.com/DavidHoerster/dcr-explorer/issues/19) | Remove Counter/Weather scaffold pages | Cleanup | low | Naomi | Done |
 | [#20](https://github.com/DavidHoerster/dcr-explorer/issues/20) | Add ConfigureAwait(false) in service awaits | Maintainability | low | Amos | Not started |
 | [#21](https://github.com/DavidHoerster/dcr-explorer/issues/21) | Extract magic strings to constants | Maintainability | low | Amos | Not started |
 | [#22](https://github.com/DavidHoerster/dcr-explorer/issues/22) | MermaidDiagram.DisposeAsync swallows all exceptions | Bug | low | Naomi | Not started |
@@ -73,9 +75,10 @@ roadmap.
 - **Update the Status column** as work progresses (Not started → In progress →
   In review → Done). Keep statuses to the values in the legend so the table
   stays parseable.
-- Scope is fixed to the code-review backlog (#2–#24). New work should be filed
-  as a fresh GitHub issue and added here under the appropriate release.
+- Scope covers the code-review backlog (#2–#24) plus subsequent post-review
+  issues (#29–#30). New work should be filed as a fresh GitHub issue and added
+  here under the appropriate release.
 
 ---
 
-_Generated from code review 2026-06-25; release triage 2026-06-26 by the Squad team (Lead: Holden)._
+_Generated from code review 2026-06-25; release triage 2026-06-26; post-review triage 2026-06-27 by the Squad team (Lead: Holden)._
