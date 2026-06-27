@@ -349,6 +349,11 @@ public class DcrAnalysisService(ILogger<DcrAnalysisService> logger) : IDcrAnalys
             return "None";
         }
 
+        if (string.Equals(transformKql.Trim(), "source", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Default (pass-through)";
+        }
+
         var value = transformKql.ToLowerInvariant();
         var insights = new List<string>();
 
